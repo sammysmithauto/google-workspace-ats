@@ -34,6 +34,11 @@ Before you install the script, ensure you have the following ready:
 1. Open a brand new, completely blank Google Sheet (type `sheets.new` into your browser).
 2. Name the spreadsheet (e.g., "Automated Job Tracker").
 3. Click **Extensions > Apps Script** from the top menu.
+
+
+<img width="985" height="989" alt="Screenshot 2026-03-03 at 04 10 37" src="https://github.com/user-attachments/assets/39d6055a-ca7a-4e93-b5ad-7992339122a3" />
+
+
 4. Delete any existing code in the editor, and paste in the full code from `Code.gs` (provided in this repository).
 5. Click the **Save** icon 💾 (or press Cmd/Ctrl + S).
 
@@ -47,12 +52,17 @@ Before you install the script, ensure you have the following ready:
 4. Under **Value**, paste your secret key from Google AI Studio.
 5. Click **Save script properties**.
 
+<img width="1553" height="978" alt="Screenshot 2026-03-03 at 04 21 38" src="https://github.com/user-attachments/assets/cd20fe57-790f-4487-b9db-cdebc7af1f01" />
+
+
 ### Step 3: Initialize the System
 
 1. Close the Apps Script tab and return to your Google Sheet. Refresh the page.
 2. You will now see a custom menu at the top called **🤖 Job Tools**.
 3. Click **🤖 Job Tools > 1. Setup Tracker & Settings**.
 * *Security Note: Because this is a custom script running on your own account, Google will ask for permission and show an "Unverified App" warning. Click **Advanced > Go to [Project Name] (unsafe)** to allow it to build your tracker.*
+
+<img width="1076" height="992" alt="Screenshot 2026-03-03 at 04 10 22" src="https://github.com/user-attachments/assets/7f66a8c5-ce46-4342-8729-2c35282bddb4" />
 
 
 4. Click **🤖 Job Tools > 2. Setup Cover Letter Tab** to generate your AI input interface.
@@ -63,6 +73,9 @@ Go to the newly created **Settings** tab in your spreadsheet and fill in the bot
 
 * **Cover Letter Template URL:** Paste the full link to your base Google Doc template.
 * **Cover Letters Folder ID:** Paste the ID of your designated Google Drive output folder.
+
+<img width="1593" height="999" alt="Screenshot 2026-03-03 at 04 28 27" src="https://github.com/user-attachments/assets/11450d74-de2a-4c5e-9b11-74b3a8fc334e" />
+
 
 ### Step 5: Automate the Background Tracker
 
@@ -80,6 +93,8 @@ To make the script scan your email automatically:
 
 5. Click **Save**.
 
+<img width="1720" height="987" alt="Screenshot 2026-03-03 at 04 21 04" src="https://github.com/user-attachments/assets/12cd13f9-e69c-4826-81cb-ced3d5b841ee" />
+
 ---
 
 ## 💻 How to Use It
@@ -96,4 +111,8 @@ To make the script scan your email automatically:
 3. Paste the full Job Description into the large input box.
 4. Click **🤖 Job Tools > ⚡ Generate Cover Letter**.
 5. Wait a few seconds for the "Success" pop-up. Your perfectly tailored, formatted cover letter is now saved as a new Google Doc in your specified Drive folder!
+
+<img width="1092" height="999" alt="Screenshot 2026-03-03 at 04 30 32" src="https://github.com/user-attachments/assets/58f04778-69da-4ae9-80ab-f1d5dbe66026" />
+
+
 
