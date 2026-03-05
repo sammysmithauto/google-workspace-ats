@@ -13,6 +13,9 @@ function onOpen() {
     .addItem('2. Setup Cover Letter Tab', 'setupCoverLetterTab')
     .addSeparator()
     .addItem('⚡ Generate Cover Letter', 'generateCoverLetter')
+    .addItem('📝 Answer App Questions', 'generateQuestionAnswers')
+    .addSeparator()
+    .addItem('🧹 Clear Current Input', 'clearInputTab')
     .addToUi();
 }
 
@@ -22,9 +25,7 @@ function setupTracker() {
   let appSheet = ss.getSheetByName("Applications");
   if (!appSheet) {
     appSheet = ss.insertSheet("Applications");
-  }
-  const appHeaders = ["Date", "Role / Job Title", "Company", "Entry Date", "Employment Type", "Work Mode", "Source", "Status", "GmailID", "GmailLink", "Notes"];
-  if (appSheet.getLastRow() === 0) {
+    const appHeaders = ["Date", "Role / Job Title", "Company", "Entry Date", "Employment Type", "Work Mode", "Source", "Status", "GmailID", "GmailLink", "Notes"];
     appSheet.appendRow(appHeaders);
     appSheet.getRange("A1:K1").setFontWeight("bold");
   }
@@ -69,16 +70,42 @@ function setupCoverLetterTab() {
     inputSheet.setColumnWidth(2, 600);
     inputSheet.getRange("B6").setWrap(true);
     
+    // Job Description Box
     inputSheet.getRange("A7:B30").merge();
     inputSheet.getRange("A7").setVerticalAlignment("top").setWrap(true);
+
+    // Application Questions Box
+    inputSheet.getRange("A32").setValue("Application Questions").setFontWeight("bold");
+    inputSheet.getRange("B32").setValue("Paste the questions from the job site below...");
+    inputSheet.getRange("A33:B45").merge().setVerticalAlignment("top").setWrap(true);
+
+    // AI Generated Answers Box
+    inputSheet.getRange("A47").setValue("AI Generated Answers").setFontWeight("bold");
+    inputSheet.getRange("A48:B60").merge().setVerticalAlignment("top").setWrap(true);
+
   } else {
     SpreadsheetApp.getUi().alert("Cover Letter Input tab already exists!");
   }
 }
 
+function clearInputTab() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const inputSheet = ss.getSheetByName("Cover Letter Input");
+  if (!inputSheet) return;
+  
+  // Clear standard fields
+  inputSheet.getRange("B1:B5").clearContent();
+  // Clear text boxes
+  inputSheet.getRange("A7").clearContent();
+  inputSheet.getRange("A33").clearContent();
+  inputSheet.getRange("A48").clearContent();
+  
+  ss.toast("Input fields cleared!", "Ready", 3);
+}
+
 /**
  * =========================================================================
- * 2. BACKGROUND GMAIL TRACKER (OPTIMIZED)
+ * 2. BACKGROUND GMAIL TRACKER
  * =========================================================================
  */
 
@@ -262,7 +289,7 @@ function determineWorkMode(text) {
 
 /**
  * =========================================================================
- * 3. AI COVER LETTER GENERATOR (STRICT TEMPLATE METHOD)
+ * 3. AI COVER LETTER GENERATOR
  * =========================================================================
  */
 
@@ -295,7 +322,6 @@ function generateCoverLetter() {
   const companyName = inputSheet.getRange("B1").getValue();
   const jobTitle = inputSheet.getRange("B2").getValue();
   const location = inputSheet.getRange("B3").getValue();
-  const startDate = inputSheet.getRange("B4").getValue();
   const formQuestions = inputSheet.getRange("B5").getValue();
   const jobDescription = inputSheet.getRange("A7").getValue();
 
@@ -315,7 +341,6 @@ function generateCoverLetter() {
     return;
   }
 
-  // THE STRICT PROMPT
   const prompt = `
     You are an expert career coach writing the body of a tailored cover letter for me.
     Use my Cover Letter Template as the ONLY base. Tailor the middle paragraphs to fit the new role.
@@ -328,7 +353,7 @@ function generateCoverLetter() {
     - Keep the same structure as the template: Title Case subheadings followed by short paragraphs.
     - Do NOT reference a CV.
     - Do NOT add claims, metrics, clients, titles, or tools that are not already explicitly in the template.
-    - If I lack direct experience for a specific requirement in the job description, DO NOT fabricate it. Instead, map my existing transferable skills (like process optimization or workflow reliability) to the requirement, and express a strong, enthusiastic intent to grow my career in that specific direction (e.g., learning new platforms).
+    - If I lack direct experience for a specific requirement, DO NOT fabricate it. Instead, map my existing transferable skills to the requirement, and express a strong intent to grow in that direction.
     - Keep it around 180-250 words.
 
     TEMPLATE TO ADAPT:
@@ -338,14 +363,12 @@ function generateCoverLetter() {
     Role: ${jobTitle}
     Company: ${companyName}
     Location/Mode: ${location}
-    Form Questions: ${formQuestions}
 
     JOB DESCRIPTION:
     ${jobDescription}
 
     OUTPUT INSTRUCTIONS:
-    Return ONLY the body paragraphs and subheadings in plain text. Do not include the "Hi" intro or the "Tools" footer, as that is already handled in the document.
-    If there are form questions, answer them two lines below the end of the text.
+    Return ONLY the body paragraphs and subheadings in plain text. Do not include the "Hi" intro or the footer, as that is already handled.
   `;
 
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
@@ -375,7 +398,6 @@ function generateCoverLetter() {
     const templateFile = DriveApp.getFileById(templateIdMatch[0]);
     const outputFolder = DriveApp.getFolderById(folderId);
     
-    // Create Document
     const newFile = templateFile.makeCopy(fileName, outputFolder);
     const newDoc = DocumentApp.openById(newFile.getId());
     const body = newDoc.getBody();
@@ -384,10 +406,8 @@ function generateCoverLetter() {
       tailoredText = "Error: The AI returned an empty response. Please check your prompt or job description.";
     }
     
-    // Inject the AI text perfectly into the tag
     body.replaceText("{{AI_COVER_LETTER}}", tailoredText);
 
-    // SMART LOCATION SWAP: Automatically update the closing line if the job is remote
     if (location.toLowerCase().includes("remote")) {
       body.replaceText("I can work from the office and I am available to start immediately.", "I can work remotely and I am available to start immediately.");
     }
@@ -396,5 +416,87 @@ function generateCoverLetter() {
     ui.alert("Success!", `Cover letter created: ${fileName}\nSaved to your specified folder.`, ui.ButtonSet.OK);
   } catch (e) {
     ui.alert("Document creation failed.\nError: " + e.toString());
+  }
+}
+
+/**
+ * =========================================================================
+ * 4. JOB APPLICATION QUESTION ANSWERER
+ * =========================================================================
+ */
+
+function generateQuestionAnswers() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const inputSheet = ss.getSheetByName("Cover Letter Input");
+  
+  if (!inputSheet) return;
+
+  const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  if (!apiKey) {
+    ui.alert("Missing API Key! Please add GEMINI_API_KEY to your Script Properties.");
+    return;
+  }
+
+  const questions = inputSheet.getRange("A33").getValue(); 
+  const jobDescription = inputSheet.getRange("A7").getValue();
+  const companyName = inputSheet.getRange("B1").getValue();
+  const jobTitle = inputSheet.getRange("B2").getValue();
+
+  if (!questions || questions.trim() === "" || questions.includes("Paste the questions")) {
+    ui.alert("Please paste the job application questions into the box first!");
+    return;
+  }
+
+  ss.toast("Analyzing questions and drafting answers...", "AI Working", 5);
+
+  const prompt = `
+    You are an expert career coach. I am applying for the role of ${jobTitle} at ${companyName}.
+    Below is a list of specific application questions from the job site. 
+    Please draft professional, concise, and high-impact answers for each question based on my background.
+
+    MY BACKGROUND (Reference only, do not invent new facts):
+    - Video Producer & Creative Developer (originally from London, based in Stockholm).
+    - Expert in Adobe Creative Suite (Premiere, After Effects), DaVinci Resolve, and Python.
+    - Specialized in automation for post-production and GenAI workflows.
+    - Focus on efficiency, repeatable quality, and performance metrics (CTR, ROAS).
+
+    JOB DESCRIPTION FOR CONTEXT:
+    ${jobDescription}
+
+    QUESTIONS TO ANSWER:
+    ${questions}
+
+    RULES:
+    - UK English.
+    - Be honest but highlight strengths.
+    - If a question asks for a link (Portfolio, LinkedIn), use placeholders like [INSERT LINK HERE].
+    - Keep answers under 150 words each unless a longer explanation is required.
+    - Do not make up experience I do not have. Focus on transferable skills.
+    - Return the output in a clear format:
+      Question: [Question] 
+      Answer: [Answer]
+  `;
+
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const payload = { "contents": [{ "parts": [{"text": prompt}] }] };
+  const options = {
+    "method": "post",
+    "contentType": "application/json",
+    "payload": JSON.stringify(payload),
+    "muteHttpExceptions": true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(apiUrl, options);
+    const data = JSON.parse(response.getContentText());
+    
+    if (data.error) throw new Error(data.error.message);
+    
+    const aiAnswers = data.candidates[0].content.parts[0].text;
+    inputSheet.getRange("A48").setValue(aiAnswers);
+    ss.toast("Answers generated!", "Success", 3);
+  } catch (e) {
+    ui.alert("Error generating answers: " + e.toString());
   }
 }
