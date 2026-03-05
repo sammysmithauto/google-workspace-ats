@@ -1,17 +1,16 @@
-# google-workspace-ats
-An automated Applicant Tracking System and AI Cover Letter Generator built entirely in Google Sheets.
-
 # 🚀 Automated ATS & AI Cover Letter Generator (Google Workspace)
 
 A fully automated, private Applicant Tracking System (ATS) and AI Cover Letter Generator that lives entirely inside your personal Google Workspace.
 
-Tired of manually logging jobs and rewriting cover letters? This tool runs in the background to automatically scan your Gmail for job application confirmations, logs them cleanly into a Google Sheet, and uses the Google Gemini API to generate perfectly tailored cover letters based on your master template.
+Tired of manually logging jobs and rewriting cover letters? This tool runs in the background to automatically scan your Gmail for job application confirmations, logs them cleanly into a Google Sheet, and uses the Google Gemini API to generate perfectly tailored cover letters based strictly on your main template.
 
 ### ✨ Features
 
-* **Automated Gmail Tracking:** Scans your inbox every 6 hours and cleanly extracts the Role, Company, and Status from ATS emails (Greenhouse, Workday, LinkedIn, etc.).
+* **Automated Gmail Tracking:** Scans your inbox every 6 hours and cleanly extracts the Role, Company, and Status from ATS emails (Greenhouse, Workday, LinkedIn, etc.). Includes a built-in stopwatch failsafe to prevent Google Apps Script execution timeouts.
 * **Smart Duplication Prevention:** Never logs the same job twice.
-* **AI Cover Letter Tailor:** Generates a highly-tailored cover letter in Google Docs based strictly on your personal template and the specific job description.
+* **AI Cover Letter Tailor:** Generates a highly tailored cover letter in Google Docs. The AI is strictly prompted to map your existing transferable skills to the new role rather than fabricating fake job experience.
+* **Formatting Preservation:** Duplicates your exact Google Doc template, keeping your layout and hyperlinks intact. It seamlessly injects the new AI paragraphs in your exact font and size using a simple text tag.
+* **Remote-Aware:** Automatically updates your closing sentence from "office" to "remotely" if the job location is listed as remote in your input tab.
 * **100% Private & Free:** Runs locally on your Google Account. No third-party extensions, no subscriptions, and your data never leaves your Google Drive.
 
 ---
@@ -22,8 +21,8 @@ Before you install the script, ensure you have the following ready:
 
 1. **A Standard Google Account:** You need access to Gmail, Google Sheets, Google Docs, and Google Drive.
 2. **A Free Google Gemini API Key:** Get one instantly from [Google AI Studio](https://aistudio.google.com/app/apikey).
-3. **A Cover Letter Template (Google Doc):** Create a base cover letter in Google Docs that the AI will use as its strict structural template. Have the URL ready.
-4. **An Output Folder (Google Drive):** Create an empty folder in your Google Drive where the AI will save your new, tailored cover letters. Have the Folder ID ready (the long string of letters/numbers at the end of the folder's URL).
+3. **A Cover Letter Template (Google Doc):** Create a base cover letter in Google Docs. Keep your standard header (contact info, links) and footer (tools, sign-off). Delete the middle paragraphs and replace them with this exact tag: `{{AI_COVER_LETTER}}`. Ensure this tag is formatted in the exact font and size you want the final generated text to be. Have the document URL ready. *(Note: Ensure your closing sentence says "I can work from the office..." so the script can automatically swap it for remote roles).*
+4. **An Output Folder (Google Drive):** Create an empty folder in your Google Drive where the script will save your tailored cover letters. Have the Folder ID ready (the long string of letters/numbers at the end of the folder's URL).
 
 ---
 
@@ -35,9 +34,7 @@ Before you install the script, ensure you have the following ready:
 2. Name the spreadsheet (e.g., "Automated Job Tracker").
 3. Click **Extensions > Apps Script** from the top menu.
 
-
 <img width="985" height="989" alt="Screenshot 2026-03-03 at 04 10 37" src="https://github.com/user-attachments/assets/39d6055a-ca7a-4e93-b5ad-7992339122a3" />
-
 
 4. Delete any existing code in the editor, and paste in the full code from `Code.gs` (provided in this repository).
 5. Click the **Save** icon 💾 (or press Cmd/Ctrl + S).
@@ -54,7 +51,6 @@ Before you install the script, ensure you have the following ready:
 
 <img width="1553" height="978" alt="Screenshot 2026-03-03 at 04 21 38" src="https://github.com/user-attachments/assets/cd20fe57-790f-4487-b9db-cdebc7af1f01" />
 
-
 ### Step 3: Initialize the System
 
 1. Close the Apps Script tab and return to your Google Sheet. Refresh the page.
@@ -64,18 +60,16 @@ Before you install the script, ensure you have the following ready:
 
 <img width="1076" height="992" alt="Screenshot 2026-03-03 at 04 10 22" src="https://github.com/user-attachments/assets/7f66a8c5-ce46-4342-8729-2c35282bddb4" />
 
-
 4. Click **🤖 Job Tools > 2. Setup Cover Letter Tab** to generate your AI input interface.
 
 ### Step 4: Configure Your Settings
 
 Go to the newly created **Settings** tab in your spreadsheet and fill in the bottom two rows:
 
-* **Cover Letter Template URL:** Paste the full link to your base Google Doc template.
+* **Cover Letter Template URL:** Paste the full link to your base Google Doc template (Ensure your document contains the `{{AI_COVER_LETTER}}` tag).
 * **Cover Letters Folder ID:** Paste the ID of your designated Google Drive output folder.
 
 <img width="1593" height="999" alt="Screenshot 2026-03-03 at 04 28 27" src="https://github.com/user-attachments/assets/11450d74-de2a-4c5e-9b11-74b3a8fc334e" />
-
 
 ### Step 5: Automate the Background Tracker
 
@@ -89,7 +83,6 @@ To make the script scan your email automatically:
 * **Event source:** `Time-driven`
 * **Type of time based trigger:** `Hour timer`
 * **Hour interval:** `Every 6 hours` (or your preference)
-
 
 5. Click **Save**.
 
@@ -113,6 +106,3 @@ To make the script scan your email automatically:
 5. Wait a few seconds for the "Success" pop-up. Your perfectly tailored, formatted cover letter is now saved as a new Google Doc in your specified Drive folder!
 
 <img width="1092" height="999" alt="Screenshot 2026-03-03 at 04 30 32" src="https://github.com/user-attachments/assets/58f04778-69da-4ae9-80ab-f1d5dbe66026" />
-
-
-
