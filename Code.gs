@@ -11,11 +11,12 @@ function onOpen() {
     .addSeparator()
     .addItem('1. Setup Tracker & Settings', 'setupTracker')
     .addItem('2. Setup Cover Letter Tab', 'setupCoverLetterTab')
+    .addItem('3. Setup Interview Q&A Tab', 'setupQATab')
     .addSeparator()
     .addItem('⚡ Generate Cover Letter', 'generateCoverLetter')
     .addItem('📝 Answer App Questions', 'generateQuestionAnswers')
     .addSeparator()
-    .addItem('🧹 Clear Current Input', 'clearInputTab')
+    .addItem('🧹 Clear Current Inputs', 'clearInputTab')
     .addToUi();
 }
 
@@ -35,12 +36,13 @@ function setupTracker() {
     settingsSheet = ss.insertSheet("Settings");
     const defaultSettings = [
       ["Setting", "Value"],
-      ["Gmail Search Query", '(label:jobs OR subject:(application OR applied OR "thank you for applying" OR ansökan OR ansökan mottagen OR "we received your application") OR from:(jobs@ OR careers@ OR no-reply@ OR teamtailor OR greenhouse OR lever OR workable OR smartrecruiters OR icims)) newer_than:365d'],
+      ["Gmail Search Query", 'subject:("your application was sent" OR "thank you for applying" OR "application received" OR "ansökan mottagen" OR "we received your application" OR "application confirmed" OR "application for") -subject:("job alert" OR "jobs similar to" OR "hiring for" OR "new jobs" OR "discover the" OR "spotlight on") -from:(alerts@) -label:Tracker-Logged'],
       ["Default Status", "Applied"],
       ["Target Sheet Name", "Applications"],
       ["Max Emails Per Run", "50"],
       ["Cover Letter Template URL", "PASTE_YOUR_BASE_COVER_LETTER_DOC_LINK_HERE"],
-      ["Cover Letters Folder ID", "PASTE_YOUR_DRIVE_FOLDER_ID_HERE"]
+      ["Cover Letters Folder ID", "PASTE_YOUR_DRIVE_FOLDER_ID_HERE"],
+      ["CV Doc URL", "PASTE_YOUR_CV_DOC_LINK_HERE"] 
     ];
     settingsSheet.getRange(1, 1, defaultSettings.length, 2).setValues(defaultSettings);
     settingsSheet.getRange("A1:B1").setFontWeight("bold");
@@ -61,51 +63,67 @@ function setupCoverLetterTab() {
       ["Job Title", ""],
       ["Location / Work Mode", ""],
       ["Start Date (If known)", ""],
-      ["Form Questions / Limits", ""],
-      ["Job Description", "Paste full description below this cell\n⬇️⬇️⬇️"]
+      ["Job Description", "Paste full job description text below this cell\n⬇️⬇️⬇️"]
     ];
-    inputSheet.getRange("A1:B6").setValues(labels);
-    inputSheet.getRange("A1:A6").setFontWeight("bold");
+    inputSheet.getRange("A1:B5").setValues(labels);
+    inputSheet.getRange("A1:A5").setFontWeight("bold");
     inputSheet.setColumnWidth(1, 200);
     inputSheet.setColumnWidth(2, 600);
-    inputSheet.getRange("B6").setWrap(true);
+    inputSheet.getRange("B5").setWrap(true);
     
-    // Job Description Box
-    inputSheet.getRange("A7:B30").merge();
-    inputSheet.getRange("A7").setVerticalAlignment("top").setWrap(true);
-
-    // Application Questions Box
-    inputSheet.getRange("A32").setValue("Application Questions").setFontWeight("bold");
-    inputSheet.getRange("B32").setValue("Paste the questions from the job site below...");
-    inputSheet.getRange("A33:B45").merge().setVerticalAlignment("top").setWrap(true);
-
-    // AI Generated Answers Box
-    inputSheet.getRange("A47").setValue("AI Generated Answers").setFontWeight("bold");
-    inputSheet.getRange("A48:B60").merge().setVerticalAlignment("top").setWrap(true);
-
+    // Clean Job Description Box (No more Q&A boxes below this)
+    inputSheet.getRange("A6:B30").merge();
+    inputSheet.getRange("A6").setVerticalAlignment("top").setWrap(true);
+    
+    SpreadsheetApp.getUi().alert("Cover Letter Input tab created cleanly.");
   } else {
     SpreadsheetApp.getUi().alert("Cover Letter Input tab already exists!");
   }
 }
 
+function setupQATab() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let qaSheet = ss.getSheetByName("Interview Q&A");
+  
+  if (!qaSheet) {
+    qaSheet = ss.insertSheet("Interview Q&A", 1);
+    const headers = ["Application Question", "AI Answer", "Feedback / Tweak (Optional)"];
+    qaSheet.appendRow(headers);
+    qaSheet.getRange("A1:C1").setFontWeight("bold").setBackground("#f3f3f3");
+    qaSheet.setColumnWidth(1, 350);
+    qaSheet.setColumnWidth(2, 500);
+    qaSheet.setColumnWidth(3, 250);
+    qaSheet.setFrozenRows(1);
+    qaSheet.getRange("A:C").setWrap(true).setVerticalAlignment("top");
+    
+    SpreadsheetApp.getUi().alert("Interview Q&A tab created! Paste one question per row in Column A.");
+  } else {
+    SpreadsheetApp.getUi().alert("Interview Q&A tab already exists!");
+  }
+}
+
 function clearInputTab() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // Clear Cover Letter Data
   const inputSheet = ss.getSheetByName("Cover Letter Input");
-  if (!inputSheet) return;
+  if (inputSheet) {
+    inputSheet.getRange("B1:B4").clearContent();
+    inputSheet.getRange("A6").clearContent();
+  }
   
-  // Clear standard fields
-  inputSheet.getRange("B1:B5").clearContent();
-  // Clear text boxes
-  inputSheet.getRange("A7").clearContent();
-  inputSheet.getRange("A33").clearContent();
-  inputSheet.getRange("A48").clearContent();
+  // Clear Q&A Data
+  const qaSheet = ss.getSheetByName("Interview Q&A");
+  if (qaSheet && qaSheet.getLastRow() > 1) {
+    qaSheet.getRange(2, 1, qaSheet.getLastRow() - 1, 3).clearContent();
+  }
   
-  ss.toast("Input fields cleared!", "Ready", 3);
+  ss.toast("All input fields cleared!", "Ready", 3);
 }
 
 /**
  * =========================================================================
- * 2. BACKGROUND GMAIL TRACKER
+ * 2. BACKGROUND GMAIL TRACKER & AI EXTRACTOR
  * =========================================================================
  */
 
@@ -129,18 +147,17 @@ function syncJobsFromGmail() {
   const colMap = {};
   headers.forEach((h, i) => colMap[h] = i);
 
-  let existingIDs = new Set();
-  if (colMap["GmailID"] !== undefined && appSheet.getLastRow() > 1) {
-    let ids = appSheet.getRange(2, colMap["GmailID"] + 1, appSheet.getLastRow() - 1, 1).getValues().flat();
-    existingIDs = new Set(ids);
+  let trackingLabel = GmailApp.getUserLabelByName("Tracker-Logged");
+  if (!trackingLabel) {
+    trackingLabel = GmailApp.createLabel("Tracker-Logged");
   }
 
   const threads = GmailApp.search(query, 0, maxThreads);
   let rowsToAdd = [];
   
   for (let i = threads.length - 1; i >= 0; i--) { 
-    if (Date.now() - startTime > 330000) {
-      console.warn("Approaching 6-minute limit. Stopping early and saving current progress.");
+    if (Date.now() - startTime > 300000) {
+      logDebug("Sync", "Timeout", "Approaching 5-minute limit. Stopping early.");
       break; 
     }
 
@@ -148,148 +165,86 @@ function syncJobsFromGmail() {
     const firstMessage = thread.getMessages()[0];
     const msgId = firstMessage.getId();
     
-    if (existingIDs.has(msgId)) continue; 
-    
     const subject = firstMessage.getSubject();
-    const body = firstMessage.getPlainBody().toLowerCase();
-    const sender = firstMessage.getFrom();
+    const body = firstMessage.getPlainBody();
+    
+    const aiData = extractJobDataWithGemini(subject, body) || {};
     
     let newRow = new Array(headers.length).fill("");
     if (colMap["Date"] !== undefined) newRow[colMap["Date"]] = ""; 
     if (colMap["Entry Date"] !== undefined) newRow[colMap["Entry Date"]] = firstMessage.getDate();
     
-    if (colMap["Role / Job Title"] !== undefined) newRow[colMap["Role / Job Title"]] = extractRole(subject, body) || "Unknown";
-    if (colMap["Company"] !== undefined) newRow[colMap["Company"]] = extractCompany(subject, sender, body) || "Unknown";
-    if (colMap["Employment Type"] !== undefined) newRow[colMap["Employment Type"]] = determineEmploymentType(subject.toLowerCase() + " " + body);
-    if (colMap["Work Mode"] !== undefined) newRow[colMap["Work Mode"]] = determineWorkMode(subject.toLowerCase() + " " + body);
-    if (colMap["Source"] !== undefined) newRow[colMap["Source"]] = extractSource(sender);
-    if (colMap["Status"] !== undefined) newRow[colMap["Status"]] = defaultStatus;
+    if (colMap["Role / Job Title"] !== undefined) newRow[colMap["Role / Job Title"]] = aiData.jobTitle || "Review Manually";
+    if (colMap["Company"] !== undefined) newRow[colMap["Company"]] = aiData.company || "Review Manually";
+    if (colMap["Employment Type"] !== undefined) newRow[colMap["Employment Type"]] = aiData.employmentType || "Unknown";
+    if (colMap["Work Mode"] !== undefined) newRow[colMap["Work Mode"]] = aiData.workMode || "Unknown";
+    if (colMap["Source"] !== undefined) newRow[colMap["Source"]] = aiData.source || "Unknown";
+    if (colMap["Status"] !== undefined) newRow[colMap["Status"]] = aiData.status || defaultStatus;
     if (colMap["GmailID"] !== undefined) newRow[colMap["GmailID"]] = msgId;
     if (colMap["GmailLink"] !== undefined) newRow[colMap["GmailLink"]] = thread.getPermalink();
 
     rowsToAdd.push(newRow);
+    thread.addLabel(trackingLabel);
+    Utilities.sleep(500); 
   }
 
   if (rowsToAdd.length > 0) {
     appSheet.getRange(appSheet.getLastRow() + 1, 1, rowsToAdd.length, headers.length).setValues(rowsToAdd);
+    logDebug("Sync", "Success", `Synced ${rowsToAdd.length} jobs.`);
     ss.toast(`Successfully synced ${rowsToAdd.length} new jobs.`, "Sync Complete", 5);
   } else {
+    logDebug("Sync", "Success", "No new jobs found.");
     ss.toast("Tracker is up to date! No new jobs found.", "Sync Complete", 3);
   }
 }
 
-function cleanText(text) {
-  if (!text) return "";
-  return text.replace(/["“”*!]/g, '').trim(); 
-}
+function extractJobDataWithGemini(emailSubject, emailBody) {
+  const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  
+  const prompt = `
+    You are an expert data extraction bot for a job application tracker. 
+    Read the following job application email subject and body, and extract the details.
+    Return ONLY a raw, valid JSON object with the exact keys below. Do not include markdown formatting or backticks.
+    If a value is not explicitly stated, use "Unknown".
 
-function extractRole(subject, body) {
-  let sub = subject.replace(/["“”*!]/g, '').trim();
-  let bodyLines = body.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
+    {
+      "jobTitle": "String (Extract the specific role)",
+      "company": "String (Extract the hiring company)",
+      "employmentType": "Full-time, Part-time, Contract/Freelance, or Unknown",
+      "workMode": "Remote, Hybrid, On-site, or Unknown",
+      "source": "LinkedIn, Teamtailor, Greenhouse, SmartRecruiters, Direct, or Other",
+      "status": "Applied, Assessment Received, Interview Requested, Rejected, or Offer"
+    }
 
-  if (/application was sent to/i.test(sub)) {
-     for (let i = 0; i < bodyLines.length; i++) {
-        if (/application was sent to/i.test(bodyLines[i])) {
-           for (let j = i + 1; j < i + 5 && j < bodyLines.length; j++) {
-              let candidate = bodyLines[j];
-              if (!/^http/i.test(candidate) && !/application was sent/i.test(candidate) && candidate.length < 120) {
-                 return cleanText(candidate);
-              }
-           }
-        }
-     }
+    Subject: ${emailSubject}
+    Body: ${emailBody}
+  `;
+
+  const payload = { "contents": [{ "parts": [{"text": prompt}] }] };
+  const options = { 
+    "method": "post", 
+    "contentType": "application/json", 
+    "payload": JSON.stringify(payload), 
+    "muteHttpExceptions": true 
+  };
+
+  try {
+    const response = fetchWithBackoff(apiUrl, options);
+    const data = JSON.parse(response.getContentText());
+    if (data.error) throw new Error(data.error.message);
+    
+    const rawJsonString = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(rawJsonString);
+  } catch (e) {
+    logDebug("AI Parsing Error", "Failed", e.toString());
+    return null; 
   }
-
-  if (/thank you for applying|application received|applying to amazon/i.test(sub)) {
-     for (let line of bodyLines) {
-        let match = line.match(/(?:applying for the|applying to the|application for the|application for|position of|interest in the) (.*?)(?: at | role| position|\.|$)/i);
-        if (match && match[1].length < 120) {
-           let foundTitle = cleanText(match[1]);
-           foundTitle = foundTitle.replace(/\s*\(ID:.*?\)/i, '');
-           return foundTitle;
-        }
-     }
-  }
-
-  let match1 = sub.match(/(?:application for|applied for|ansökan till) (.*?)(?: at | på | - |$)/i);
-  if (match1) return cleanText(match1[1]);
-
-  let match2 = sub.match(/^"?([^"]+)"?:\s*([^-]+)/);
-  if (match2) return cleanText(match2[1]);
-
-  for (let line of bodyLines) {
-     let fallbackMatch = line.match(/(?:role of|position of|applying for the|application for the) ([a-zA-Z0-9\s&,\-\.\/\(\)]+?)(?: position| role| at |\.|!|$)/i);
-     if (fallbackMatch && fallbackMatch[1].length < 120) {
-         let foundTitle = cleanText(fallbackMatch[1]);
-         return foundTitle.replace(/\s*\(ID:.*?\)/i, '');
-     }
-  }
-
-  if (sub.length < 60 && !/(application|applied|thank you)/i.test(sub)) {
-      return cleanText(sub);
-  }
-
-  return "Unknown";
-}
-
-function extractCompany(subject, sender, body) {
-  let sub = subject.replace(/["“”*!]/g, '').trim();
-
-  let m1 = sub.match(/application was sent to (.*?)$/i);
-  if (m1) return cleanText(m1[1]);
-
-  let m2 = sub.match(/applying to (.*?)$/i);
-  if (m2) return cleanText(m2[1]);
-
-  let m3 = sub.match(/(?:application|applied) to (.*?)(?: -|$)/i);
-  if (m3) return cleanText(m3[1]);
-
-  let m4 = sub.match(/(?: at | på )([^-\(]+)/i);
-  if (m4) return cleanText(m4[1]);
-
-  let m5 = sub.match(/^"?[^"]+"?:\s*([^-]+)/);
-  if (m5) return cleanText(m5[1]);
-
-  let senderNameMatch = sender.match(/^"?(.*?)"?\s*</);
-  if (senderNameMatch) {
-     let sName = senderNameMatch[1].trim();
-     if (!/teamtailor|greenhouse|lever|workable|smartrecruiters|icims|linkedin|glassdoor|alerts/i.test(sName) && sName.length > 2) {
-        return cleanText(sName);
-     }
-  }
-
-  return "Unknown";
-}
-
-function extractSource(sender) {
-  const s = sender.toLowerCase();
-  if (s.includes("linkedin")) return "LinkedIn";
-  if (s.includes("teamtailor")) return "Teamtailor";
-  if (s.includes("greenhouse")) return "Greenhouse";
-  if (s.includes("lever")) return "Lever";
-  if (s.includes("workable")) return "Workable";
-  if (s.includes("smartrecruiters")) return "SmartRecruiters";
-  if (s.includes("icims")) return "iCIMS";
-  return "Other";
-}
-
-function determineEmploymentType(text) {
-  if (/(full-time|permanent|heltid)/.test(text)) return "Full-time";
-  if (/(part-time|deltid|30%|50%)/.test(text)) return "Part-time";
-  if (/(contract|consultant|konsult|freelance|interim)/.test(text)) return "Contract/Freelance";
-  return "Unknown";
-}
-
-function determineWorkMode(text) {
-  if (/(remote|work from home|fjärrjobb)/.test(text)) return "Remote";
-  if (/(hybrid|hybridarbete)/.test(text)) return "Hybrid";
-  if (/(on-site|onsite|på plats)/.test(text)) return "On-site";
-  return "Unknown";
 }
 
 /**
  * =========================================================================
- * 3. AI COVER LETTER GENERATOR
+ * 3. AI COVER LETTER GENERATOR 
  * =========================================================================
  */
 
@@ -306,6 +261,7 @@ function generateCoverLetter() {
   const settingsSheet = ss.getSheetByName("Settings");
   const templateUrl = settingsSheet.getRange("B6").getValue(); 
   const folderId = settingsSheet.getRange("B7").getValue(); 
+  const cvDocUrl = settingsSheet.getRange("B8").getValue(); 
   
   const templateIdMatch = templateUrl.match(/[-\w]{25,}/);
   if (!templateIdMatch) {
@@ -322,41 +278,53 @@ function generateCoverLetter() {
   const companyName = inputSheet.getRange("B1").getValue();
   const jobTitle = inputSheet.getRange("B2").getValue();
   const location = inputSheet.getRange("B3").getValue();
-  const formQuestions = inputSheet.getRange("B5").getValue();
-  const jobDescription = inputSheet.getRange("A7").getValue();
+  const jobDescription = inputSheet.getRange("A6").getValue(); // Reverted to text input
 
   if (!companyName || !jobDescription) {
-    ui.alert("Please provide at least a Company Name and Job Description.");
+    ss.toast("Please provide a Company Name and Job Description.", "Missing Info", 4);
     return;
   }
 
-  ss.toast("Reading strict template and calling Gemini...", "Processing", 5);
+  ss.toast("Reading template & CV, then calling Gemini...", "Processing", 5);
 
   let templateText = "";
   try {
     const templateDoc = DocumentApp.openById(templateIdMatch[0]);
     templateText = templateDoc.getBody().getText();
   } catch (e) {
-    ui.alert("Error reading template. Ensure the script has access to the Doc.");
+    logDebug("Template Read", "Error", e.toString());
+    ss.toast("Could not read template document. Check settings.", "Error", 5);
     return;
   }
 
+  let cvText = "";
+  try {
+    if (cvDocUrl) {
+      const cvDocIdMatch = cvDocUrl.match(/[-\w]{25,}/);
+      if (cvDocIdMatch) {
+        cvText = DocumentApp.openById(cvDocIdMatch[0]).getBody().getText();
+      }
+    }
+  } catch (e) {
+    logDebug("CV Read", "Warning", "Could not load CV Doc.");
+  }
+
   const prompt = `
-    You are an expert career coach writing the body of a tailored cover letter for me.
-    Use my Cover Letter Template as the ONLY base. Tailor the middle paragraphs to fit the new role.
+    You are an expert copywriter and career coach. Write the body paragraphs of a highly tailored cover letter for me.
 
     CRITICAL RULES:
-    - UK English
-    - Clear, concise, professional
-    - No jargon, no fluff, no invented details
-    - Use "I am" style wording
-    - Keep the same structure as the template: Title Case subheadings followed by short paragraphs.
-    - Do NOT reference a CV.
-    - Do NOT add claims, metrics, clients, titles, or tools that are not already explicitly in the template.
-    - If I lack direct experience for a specific requirement, DO NOT fabricate it. Instead, map my existing transferable skills to the requirement, and express a strong intent to grow in that direction.
-    - Keep it around 180-250 words.
+    - UK English.
+    - Write in a natural, engaging, and professional tone. DO NOT sound like a robotic AI.
+    - DO NOT use subheadings or bullet points. Write 2 to 3 cohesive, flowing paragraphs.
+    - You MUST explicitly mention the company (${companyName}) and the role (${jobTitle}) in the text.
+    - STRICT FOCUS: Do NOT assume or make up any experiences, tools, or metrics not explicitly stated in the CV context. Rely ONLY on the provided background details.
+    - Connect the dots: Explain exactly how my specific background solves the specific problems listed in the Job Description.
+    - Keep it around 180-250 words total.
 
-    TEMPLATE TO ADAPT:
+    HERE IS MY CV CONTEXT (Use this to pull specific facts and skills):
+    ${cvText ? cvText : "(No CV context provided)"}
+
+    TEMPLATE TO ADAPT (Maintain this structure):
     ${templateText}
 
     INPUT DETAILS:
@@ -368,31 +336,27 @@ function generateCoverLetter() {
     ${jobDescription}
 
     OUTPUT INSTRUCTIONS:
-    Return ONLY the body paragraphs and subheadings in plain text. Do not include the "Hi" intro or the footer, as that is already handled.
+    Return ONLY the tailored body paragraphs in plain text. Do not include the "Hi" intro or the footer.
   `;
 
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
   const payload = { "contents": [{ "parts": [{"text": prompt}] }] };
-  const options = {
-    "method": "post",
-    "contentType": "application/json",
-    "payload": JSON.stringify(payload),
-    "muteHttpExceptions": true
-  };
+  const options = { "method": "post", "contentType": "application/json", "payload": JSON.stringify(payload), "muteHttpExceptions": true };
 
   let tailoredText = "";
   try {
-    const response = UrlFetchApp.fetch(apiUrl, options);
+    const response = fetchWithBackoff(apiUrl, options);
     const data = JSON.parse(response.getContentText());
     if (data.error) throw new Error(data.error.message);
     tailoredText = data.candidates[0].content.parts[0].text.trim();
   } catch (e) {
-    ui.alert("Error with AI: " + e.toString());
+    logDebug("Generate Cover Letter", "Error", e.toString());
+    ss.toast("Failed to connect to AI. Check Debug Logs.", "Error", 5);
     return;
   }
 
   const cleanCompanyName = companyName.toString().replace(/[^a-zA-Z0-9]/g, "_");
-  const fileName = `Sammy_Smith_Cover_Letter_${cleanCompanyName}`;
+  const fileName = `My_Cover_Letter_${cleanCompanyName}`;
   
   try {
     const templateFile = DriveApp.getFileById(templateIdMatch[0]);
@@ -413,24 +377,32 @@ function generateCoverLetter() {
     }
     
     newDoc.saveAndClose();
-    ui.alert("Success!", `Cover letter created: ${fileName}\nSaved to your specified folder.`, ui.ButtonSet.OK);
+    ss.toast(`Cover letter created: ${fileName}`, "Success!", 5);
+    logDebug("Generate Cover Letter", "Success", `Generated for ${companyName}`);
   } catch (e) {
-    ui.alert("Document creation failed.\nError: " + e.toString());
+    logDebug("Document Creation", "Error", e.toString());
+    ss.toast("Failed to save Document. Check Debug Logs.", "Error", 5);
   }
 }
 
 /**
  * =========================================================================
- * 4. JOB APPLICATION QUESTION ANSWERER
+ * 4. DYNAMIC TWO-COLUMN Q&A ANSWERER
  * =========================================================================
  */
 
 function generateQuestionAnswers() {
   const ui = SpreadsheetApp.getUi();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const inputSheet = ss.getSheetByName("Cover Letter Input");
   
-  if (!inputSheet) return;
+  const qaSheet = ss.getSheetByName("Interview Q&A");
+  const inputSheet = ss.getSheetByName("Cover Letter Input");
+  const settingsSheet = ss.getSheetByName("Settings");
+  
+  if (!qaSheet) {
+    ss.toast("Missing Interview Q&A tab. Please run 'Setup Interview Q&A Tab' from the menu.", "Error", 5);
+    return;
+  }
 
   const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
   if (!apiKey) {
@@ -438,65 +410,145 @@ function generateQuestionAnswers() {
     return;
   }
 
-  const questions = inputSheet.getRange("A33").getValue(); 
-  const jobDescription = inputSheet.getRange("A7").getValue();
-  const companyName = inputSheet.getRange("B1").getValue();
-  const jobTitle = inputSheet.getRange("B2").getValue();
+  // Gather Job Context
+  const companyName = inputSheet ? inputSheet.getRange("B1").getValue() : "Unknown Company";
+  const jobTitle = inputSheet ? inputSheet.getRange("B2").getValue() : "Unknown Role";
+  const jobDescription = inputSheet ? inputSheet.getRange("A6").getValue() : "";
+  const cvDocUrl = settingsSheet ? settingsSheet.getRange("B8").getValue() : ""; 
 
-  if (!questions || questions.trim() === "" || questions.includes("Paste the questions")) {
-    ui.alert("Please paste the job application questions into the box first!");
+  // Gather Questions from Q&A Tab
+  const lastRow = qaSheet.getLastRow();
+  if (lastRow < 2) {
+    ss.toast("Please paste your questions into Column A of the Interview Q&A tab.", "No Questions", 4);
     return;
   }
 
-  ss.toast("Analyzing questions and drafting answers...", "AI Working", 5);
+  const dataRange = qaSheet.getRange(2, 1, lastRow - 1, 3);
+  const rows = dataRange.getValues();
+  let questionsToProcess = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const question = rows[i][0];
+    const feedback = rows[i][2]; // User can leave notes here to guide the AI
+    
+    if (question && question.trim() !== "") {
+      questionsToProcess.push({
+        rowIndex: i + 2, // Keep track of the exact row number
+        questionText: question,
+        userFeedback: feedback
+      });
+    }
+  }
+
+  if (questionsToProcess.length === 0) {
+    ss.toast("No valid questions found in Column A.", "No Questions", 4);
+    return;
+  }
+
+  ss.toast(`Analyzing ${questionsToProcess.length} questions...`, "AI Working", 5);
+
+  // Fetch CV Context 
+  let cvText = "";
+  try {
+    if (cvDocUrl) {
+      const cvDocIdMatch = cvDocUrl.match(/[-\w]{25,}/);
+      if (cvDocIdMatch) {
+        cvText = DocumentApp.openById(cvDocIdMatch[0]).getBody().getText();
+      }
+    }
+  } catch (e) {
+    logDebug("CV Read", "Warning", "Could not load CV Doc for Q&A.");
+  }
 
   const prompt = `
     You are an expert career coach. I am applying for the role of ${jobTitle} at ${companyName}.
-    Below is a list of specific application questions from the job site. 
+    I have provided a JSON array of specific application questions.
     Please draft professional, concise, and high-impact answers for each question based on my background.
 
-    MY BACKGROUND (Reference only, do not invent new facts):
-    - Video Producer & Creative Developer (originally from London, based in Stockholm).
-    - Expert in Adobe Creative Suite (Premiere, After Effects), DaVinci Resolve, and Python.
-    - Specialized in automation for post-production and GenAI workflows.
-    - Focus on efficiency, repeatable quality, and performance metrics (CTR, ROAS).
+    CRITICAL RULES:
+    - UK English.
+    - STRICT FOCUS: Do NOT assume or make up any experiences, tools, or metrics not explicitly stated in the CV context. Rely ONLY on the provided background details.
+    - If "userFeedback" is provided for a question, you MUST alter your answer to follow that feedback exactly (e.g., if feedback says "make it shorter", keep it under 50 words).
+    - Return ONLY a raw, valid JSON array. Do not include markdown formatting or backticks.
+    
+    EXPECTED OUTPUT FORMAT:
+    [
+      { "rowIndex": [Keep the original rowIndex], "answer": "The tailored answer..." }
+    ]
+
+    MY CV BACKGROUND:
+    ${cvText ? cvText : "Video Producer, expert in DaVinci Resolve, Python automation, GenAI workflows."}
 
     JOB DESCRIPTION FOR CONTEXT:
     ${jobDescription}
 
     QUESTIONS TO ANSWER:
-    ${questions}
-
-    RULES:
-    - UK English.
-    - Be honest but highlight strengths.
-    - If a question asks for a link (Portfolio, LinkedIn), use placeholders like [INSERT LINK HERE].
-    - Keep answers under 150 words each unless a longer explanation is required.
-    - Do not make up experience I do not have. Focus on transferable skills.
-    - Return the output in a clear format:
-      Question: [Question] 
-      Answer: [Answer]
+    ${JSON.stringify(questionsToProcess)}
   `;
 
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
   const payload = { "contents": [{ "parts": [{"text": prompt}] }] };
-  const options = {
-    "method": "post",
-    "contentType": "application/json",
-    "payload": JSON.stringify(payload),
-    "muteHttpExceptions": true
-  };
+  const options = { "method": "post", "contentType": "application/json", "payload": JSON.stringify(payload), "muteHttpExceptions": true };
 
   try {
-    const response = UrlFetchApp.fetch(apiUrl, options);
+    const response = fetchWithBackoff(apiUrl, options);
     const data = JSON.parse(response.getContentText());
-    
     if (data.error) throw new Error(data.error.message);
     
-    const aiAnswers = data.candidates[0].content.parts[0].text;
-    inputSheet.getRange("A48").setValue(aiAnswers);
-    ss.toast("Answers generated!", "Success", 3);
+    // Clean markdown if Gemini accidentally includes it
+    const rawJsonString = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const aiResponses = JSON.parse(rawJsonString);
+
+    // Map answers back to the exact correct rows in Column B
+    aiResponses.forEach(item => {
+      qaSheet.getRange(item.rowIndex, 2).setValue(item.answer);
+    });
+
+    ss.toast("All answers successfully generated!", "Success", 3);
+    logDebug("Q&A Generation", "Success", `Answered ${aiResponses.length} questions.`);
   } catch (e) {
-    ui.alert("Error generating answers: " + e.toString());
+    logDebug("Q&A Generation", "Error", e.toString());
+    ss.toast("Failed to parse AI responses. Check Debug Logs.", "Error", 5);
+  }
+}
+
+/**
+ * =========================================================================
+ * 5. UTILITIES
+ * =========================================================================
+ */
+
+function logDebug(action, status, details) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let logSheet = ss.getSheetByName("Debug_Logs");
+  
+  if (!logSheet) {
+    logSheet = ss.insertSheet("Debug_Logs");
+    logSheet.appendRow(["Timestamp", "Action", "Status", "Details"]);
+    logSheet.getRange("A1:D1").setFontWeight("bold");
+    logSheet.hideSheet();
+  }
+  
+  if (logSheet.getLastRow() > 500) {
+    logSheet.deleteRows(2, 100);
+  }
+  
+  logSheet.appendRow([new Date(), action, status, details]);
+}
+
+function fetchWithBackoff(url, options, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const response = UrlFetchApp.fetch(url, options);
+      if (response.getResponseCode() === 429 || response.getResponseCode() >= 500) {
+         throw new Error("API Server Busy: HTTP " + response.getResponseCode());
+      }
+      return response;
+    } catch (e) {
+      if (i === maxRetries - 1) throw e; 
+      const delay = Math.pow(2, i) * 1000 + Math.round(Math.random() * 1000); 
+      Utilities.sleep(delay);
+      logDebug("API Retry", "Warning", `Waiting ${delay}ms before retry. Error: ${e.toString()}`);
+    }
   }
 }
