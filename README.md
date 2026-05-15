@@ -1,9 +1,3 @@
-Here is the fully updated V3 README. It maintains your clean formatting but includes all the new architectural upgrades, specifically the CV integration and the new two-column Interview Q&A database workflow.
-
-You can copy and paste this directly into your GitHub repository:
-
----
-
 # 🚀 Automated ATS & AI Cover Letter Generator (Google Workspace)
 
 A fully automated, private Applicant Tracking System (ATS) and AI Application Command Center that lives entirely inside your personal Google Workspace.
