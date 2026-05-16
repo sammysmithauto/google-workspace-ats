@@ -1,4 +1,16 @@
 /**
+ * Automated ATS & AI Cover Letter Generator v3.0
+ * Designed & Built by Samuel Smith
+ * Open Source: MIT License
+
+/**
+ * =========================================================================
+ * 1. USER INTERFACE & SETUP
+ * =========================================================================
+ */
+
+
+/**
  * =========================================================================
  * 1. USER INTERFACE & SETUP
  * =========================================================================
@@ -16,7 +28,8 @@ function onOpen() {
     .addItem('⚡ Generate Cover Letter', 'generateCoverLetter')
     .addItem('📝 Answer App Questions', 'generateQuestionAnswers')
     .addSeparator()
-    .addItem('🧹 Clear Current Inputs', 'clearInputTab')
+    .addItem('🧹 Clean & Sort Tracker', 'cleanAndSortTracker') 
+    .addItem('🗑️ Clear Current Inputs', 'clearInputTab')
     .addToUi();
 }
 
@@ -26,9 +39,9 @@ function setupTracker() {
   let appSheet = ss.getSheetByName("Applications");
   if (!appSheet) {
     appSheet = ss.insertSheet("Applications");
-    const appHeaders = ["Date", "Role / Job Title", "Company", "Entry Date", "Employment Type", "Work Mode", "Source", "Status", "GmailID", "GmailLink", "Notes"];
+    const appHeaders = ["Date Applied", "Role", "Company", "Work Mode", "Source", "Status", "GmailID", "GmailLink", "Notes"];
     appSheet.appendRow(appHeaders);
-    appSheet.getRange("A1:K1").setFontWeight("bold");
+    appSheet.getRange("A1:I1").setFontWeight("bold");
   }
   
   let settingsSheet = ss.getSheetByName("Settings");
@@ -36,7 +49,7 @@ function setupTracker() {
     settingsSheet = ss.insertSheet("Settings");
     const defaultSettings = [
       ["Setting", "Value"],
-      ["Gmail Search Query", 'subject:("your application was sent" OR "thank you for applying" OR "application received" OR "ansökan mottagen" OR "we received your application" OR "application confirmed" OR "application for") -subject:("job alert" OR "jobs similar to" OR "hiring for" OR "new jobs" OR "discover the" OR "spotlight on") -from:(alerts@) -label:Tracker-Logged'],
+      ["Gmail Search Query", 'subject:("your application was sent" OR "thank you for applying" OR "thank you for your application" OR "application received" OR "ansökan mottagen" OR "we received your application" OR "application confirmed" OR "application for") -subject:("job alert" OR "jobs similar to" OR "hiring for" OR "new jobs" OR "discover the" OR "spotlight on") -"unfortunately" -"not able to offer" -from:(alerts@) -label:Tracker-Logged'],
       ["Default Status", "Applied"],
       ["Target Sheet Name", "Applications"],
       ["Max Emails Per Run", "50"],
@@ -71,13 +84,8 @@ function setupCoverLetterTab() {
     inputSheet.setColumnWidth(2, 600);
     inputSheet.getRange("B5").setWrap(true);
     
-    // Clean Job Description Box (No more Q&A boxes below this)
     inputSheet.getRange("A6:B30").merge();
     inputSheet.getRange("A6").setVerticalAlignment("top").setWrap(true);
-    
-    SpreadsheetApp.getUi().alert("Cover Letter Input tab created cleanly.");
-  } else {
-    SpreadsheetApp.getUi().alert("Cover Letter Input tab already exists!");
   }
 }
 
@@ -95,30 +103,95 @@ function setupQATab() {
     qaSheet.setColumnWidth(3, 250);
     qaSheet.setFrozenRows(1);
     qaSheet.getRange("A:C").setWrap(true).setVerticalAlignment("top");
-    
-    SpreadsheetApp.getUi().alert("Interview Q&A tab created! Paste one question per row in Column A.");
-  } else {
-    SpreadsheetApp.getUi().alert("Interview Q&A tab already exists!");
-  }
+  } 
 }
 
 function clearInputTab() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  
-  // Clear Cover Letter Data
   const inputSheet = ss.getSheetByName("Cover Letter Input");
   if (inputSheet) {
     inputSheet.getRange("B1:B4").clearContent();
     inputSheet.getRange("A6").clearContent();
   }
-  
-  // Clear Q&A Data
   const qaSheet = ss.getSheetByName("Interview Q&A");
   if (qaSheet && qaSheet.getLastRow() > 1) {
     qaSheet.getRange(2, 1, qaSheet.getLastRow() - 1, 3).clearContent();
   }
-  
   ss.toast("All input fields cleared!", "Ready", 3);
+}
+
+/**
+ * =========================================================================
+ * BULLETPROOF CLEAN & SORT TRACKER
+ * =========================================================================
+ */
+function cleanAndSortTracker(isSilent = false) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const settingsSheet = ss.getSheetByName("Settings");
+  if (!settingsSheet) return;
+  
+  const targetSheetName = settingsSheet.getRange("B4").getValue();
+  const appSheet = ss.getSheetByName(targetSheetName);
+
+  if (!appSheet || appSheet.getLastRow() < 2) {
+    if (!isSilent) ss.toast("No data to clean.", "Done", 3);
+    return;
+  }
+
+  const fullRange = appSheet.getDataRange();
+  const values = fullRange.getValues();
+  const headers = values[0];
+  const data = values.slice(1);
+
+  const gmailIdIndex = headers.indexOf("GmailID");
+  let dateIndex = headers.indexOf("Date Applied");
+  if (dateIndex === -1) dateIndex = headers.indexOf("Entry Date"); 
+
+  let uniqueData = [];
+  let seenIds = new Set();
+  let duplicateCount = 0;
+
+  for (let i = 0; i < data.length; i++) {
+    let row = data[i];
+    let id = gmailIdIndex !== -1 ? row[gmailIdIndex] : null;
+
+    if (row.join("").trim() === "") continue;
+
+    if (id && id.toString().trim() !== "") {
+      if (!seenIds.has(id)) {
+        seenIds.add(id);
+        uniqueData.push(row);
+      } else {
+        duplicateCount++;
+      }
+    } else {
+      uniqueData.push(row);
+    }
+  }
+
+  if (dateIndex !== -1) {
+    uniqueData.sort((a, b) => {
+      let valA = a[dateIndex];
+      let valB = b[dateIndex];
+      
+      let timeA = (valA instanceof Date) ? valA.getTime() : new Date(valA).getTime();
+      let timeB = (valB instanceof Date) ? valB.getTime() : new Date(valB).getTime();
+      
+      if (isNaN(timeA)) timeA = 0;
+      if (isNaN(timeB)) timeB = 0;
+      
+      return timeB - timeA; 
+    });
+  }
+
+  appSheet.getRange(2, 1, appSheet.getLastRow(), appSheet.getLastColumn()).clearContent();
+  if (uniqueData.length > 0) {
+    appSheet.getRange(2, 1, uniqueData.length, headers.length).setValues(uniqueData);
+  }
+
+  if (!isSilent) {
+    SpreadsheetApp.getUi().alert(`Clean & Sort Complete!\n\nRemoved ${duplicateCount} duplicate rows.\nSorted perfectly by Date (Newest at top).\nAny manual rows without a date have been pushed safely to the bottom.`);
+  }
 }
 
 /**
@@ -170,18 +243,27 @@ function syncJobsFromGmail() {
     
     const aiData = extractJobDataWithGemini(subject, body) || {};
     
+    // NEW RULE: IF AI DETECTS A REJECTION, DO NOT LOG IT
+    if (aiData.status && aiData.status.toLowerCase().includes("reject")) {
+      thread.addLabel(trackingLabel); // Label it so we don't scan it again
+      Utilities.sleep(500);
+      continue; // Skip the rest of this loop and move to the next email
+    }
+    
     let newRow = new Array(headers.length).fill("");
-    if (colMap["Date"] !== undefined) newRow[colMap["Date"]] = ""; 
+    
+    if (colMap["Date Applied"] !== undefined) newRow[colMap["Date Applied"]] = firstMessage.getDate();
     if (colMap["Entry Date"] !== undefined) newRow[colMap["Entry Date"]] = firstMessage.getDate();
     
+    if (colMap["Role"] !== undefined) newRow[colMap["Role"]] = aiData.jobTitle || "Review Manually";
     if (colMap["Role / Job Title"] !== undefined) newRow[colMap["Role / Job Title"]] = aiData.jobTitle || "Review Manually";
     if (colMap["Company"] !== undefined) newRow[colMap["Company"]] = aiData.company || "Review Manually";
-    if (colMap["Employment Type"] !== undefined) newRow[colMap["Employment Type"]] = aiData.employmentType || "Unknown";
     if (colMap["Work Mode"] !== undefined) newRow[colMap["Work Mode"]] = aiData.workMode || "Unknown";
     if (colMap["Source"] !== undefined) newRow[colMap["Source"]] = aiData.source || "Unknown";
     if (colMap["Status"] !== undefined) newRow[colMap["Status"]] = aiData.status || defaultStatus;
     if (colMap["GmailID"] !== undefined) newRow[colMap["GmailID"]] = msgId;
     if (colMap["GmailLink"] !== undefined) newRow[colMap["GmailLink"]] = thread.getPermalink();
+    if (colMap["Notes"] !== undefined) newRow[colMap["Notes"]] = "";
 
     rowsToAdd.push(newRow);
     thread.addLabel(trackingLabel);
@@ -192,6 +274,10 @@ function syncJobsFromGmail() {
     appSheet.getRange(appSheet.getLastRow() + 1, 1, rowsToAdd.length, headers.length).setValues(rowsToAdd);
     logDebug("Sync", "Success", `Synced ${rowsToAdd.length} jobs.`);
     ss.toast(`Successfully synced ${rowsToAdd.length} new jobs.`, "Sync Complete", 5);
+    
+    // NEW RULE: AUTO-SORT THE SHEET SILENTLY AFTER ADDING NEW JOBS
+    cleanAndSortTracker(true); 
+
   } else {
     logDebug("Sync", "Success", "No new jobs found.");
     ss.toast("Tracker is up to date! No new jobs found.", "Sync Complete", 3);
@@ -211,7 +297,6 @@ function extractJobDataWithGemini(emailSubject, emailBody) {
     {
       "jobTitle": "String (Extract the specific role)",
       "company": "String (Extract the hiring company)",
-      "employmentType": "Full-time, Part-time, Contract/Freelance, or Unknown",
       "workMode": "Remote, Hybrid, On-site, or Unknown",
       "source": "LinkedIn, Teamtailor, Greenhouse, SmartRecruiters, Direct, or Other",
       "status": "Applied, Assessment Received, Interview Requested, Rejected, or Offer"
@@ -222,18 +307,12 @@ function extractJobDataWithGemini(emailSubject, emailBody) {
   `;
 
   const payload = { "contents": [{ "parts": [{"text": prompt}] }] };
-  const options = { 
-    "method": "post", 
-    "contentType": "application/json", 
-    "payload": JSON.stringify(payload), 
-    "muteHttpExceptions": true 
-  };
+  const options = { "method": "post", "contentType": "application/json", "payload": JSON.stringify(payload), "muteHttpExceptions": true };
 
   try {
     const response = fetchWithBackoff(apiUrl, options);
     const data = JSON.parse(response.getContentText());
     if (data.error) throw new Error(data.error.message);
-    
     const rawJsonString = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
     return JSON.parse(rawJsonString);
   } catch (e) {
@@ -278,7 +357,7 @@ function generateCoverLetter() {
   const companyName = inputSheet.getRange("B1").getValue();
   const jobTitle = inputSheet.getRange("B2").getValue();
   const location = inputSheet.getRange("B3").getValue();
-  const jobDescription = inputSheet.getRange("A6").getValue(); // Reverted to text input
+  const jobDescription = inputSheet.getRange("A6").getValue();
 
   if (!companyName || !jobDescription) {
     ss.toast("Please provide a Company Name and Job Description.", "Missing Info", 4);
@@ -410,13 +489,11 @@ function generateQuestionAnswers() {
     return;
   }
 
-  // Gather Job Context
   const companyName = inputSheet ? inputSheet.getRange("B1").getValue() : "Unknown Company";
   const jobTitle = inputSheet ? inputSheet.getRange("B2").getValue() : "Unknown Role";
   const jobDescription = inputSheet ? inputSheet.getRange("A6").getValue() : "";
   const cvDocUrl = settingsSheet ? settingsSheet.getRange("B8").getValue() : ""; 
 
-  // Gather Questions from Q&A Tab
   const lastRow = qaSheet.getLastRow();
   if (lastRow < 2) {
     ss.toast("Please paste your questions into Column A of the Interview Q&A tab.", "No Questions", 4);
@@ -429,11 +506,11 @@ function generateQuestionAnswers() {
 
   for (let i = 0; i < rows.length; i++) {
     const question = rows[i][0];
-    const feedback = rows[i][2]; // User can leave notes here to guide the AI
+    const feedback = rows[i][2]; 
     
     if (question && question.trim() !== "") {
       questionsToProcess.push({
-        rowIndex: i + 2, // Keep track of the exact row number
+        rowIndex: i + 2, 
         questionText: question,
         userFeedback: feedback
       });
@@ -447,7 +524,6 @@ function generateQuestionAnswers() {
 
   ss.toast(`Analyzing ${questionsToProcess.length} questions...`, "AI Working", 5);
 
-  // Fetch CV Context 
   let cvText = "";
   try {
     if (cvDocUrl) {
@@ -495,11 +571,9 @@ function generateQuestionAnswers() {
     const data = JSON.parse(response.getContentText());
     if (data.error) throw new Error(data.error.message);
     
-    // Clean markdown if Gemini accidentally includes it
     const rawJsonString = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
     const aiResponses = JSON.parse(rawJsonString);
 
-    // Map answers back to the exact correct rows in Column B
     aiResponses.forEach(item => {
       qaSheet.getRange(item.rowIndex, 2).setValue(item.answer);
     });
