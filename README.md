@@ -7,7 +7,8 @@ Tired of manually logging jobs, rewriting cover letters, and struggling over cus
 ### ✨ Features
 
 * **Automated Gmail Tracking:** Scans your inbox every 6 hours and uses a Semantic JSON AI Pipeline to cleanly extract the Role, Company, Work Mode, and Status from ATS emails (Greenhouse, Workday, LinkedIn, etc.).
-* **Smart Duplication Prevention:** Uses a robust background Gmail labeling system (`Tracker-Logged`) to ensure it never logs the same job twice.
+* **Smart Rejection Filter:** The AI actively analyzes email context and automatically ignores rejection emails (even if the subject line is misleading), ensuring your tracker only logs valid applications.
+* **Auto-Clean & Sort:** Every time the tracker syncs, it silently scrubs duplicate entries and perfectly organizes your sheet chronologically (newest first), pushing manual, undated notes safely to the bottom.
 * **Contextual AI Cover Letter Tailor:** Generates a highly tailored cover letter in Google Docs. The AI reads your actual CV/Resume document and maps your existing transferable skills to the new role rather than fabricating fake job experience.
 * **Dynamic Q&A Database:** Replaces messy text boxes with a dedicated, two-column interactive database. Paste custom questions from a job board, and the AI drafts professional answers. Add a note in the "Feedback" column (e.g., "Make this shorter") to have the AI instantly refine its response.
 * **Formatting Preservation:** Duplicates your exact Google Doc template, keeping your layout and hyperlinks intact. It seamlessly injects the new AI paragraphs in your exact font and size using a simple text tag.
@@ -90,8 +91,9 @@ To make the script scan your email automatically:
 
 ### The Automated Tracker
 
-* Your spreadsheet will automatically update in the background as you apply for jobs.
+* Your spreadsheet will automatically update in the background as you apply for jobs. It will securely extract data, filter out rejections, and sort your list chronologically.
 * To force a manual scan immediately, click **🤖 Job Tools > 🔄 Sync Gmail Now**.
+* To manually tidy up the sheet after typing in your own notes, click **🤖 Job Tools > 🧹 Clean & Sort Tracker**.
 
 ### The Cover Letter Generator
 
